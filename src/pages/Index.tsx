@@ -1,24 +1,76 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, Clock, Bell, Shield, Users, Search, QrCode } from "lucide-react";
+import { MapPin, Clock, Bell, Shield, Users, Search, QrCode, LogOut } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client";
 import TrackingMap from "@/components/TrackingMap";
 import LocationHistory from "@/components/LocationHistory";
 import NotificationPanel from "@/components/NotificationPanel";
 import CodeDisplay from "@/components/CodeDisplay";
 
 const Index = () => {
+  const { user, signOut, loading: authLoading } = useAuth();
   const [partnerCode, setPartnerCode] = useState("");
   const [isTracking, setIsTracking] = useState(false);
   const [partnerData, setPartnerData] = useState(null);
   const [showCodeDisplay, setShowCodeDisplay] = useState(false);
+  const [userProfile, setUserProfile] = useState(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
 
-  const handleTrackPartner = () => {
+  // Redirect to auth if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  // Fetch user profile when user is loaded
+  useEffect(() => {
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
+
+  const fetchUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+
+      setUserProfile(data);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (error) {
+      toast({
+        title: "Erro ao sair",
+        description: error.message,
+        variant: "destructive",
+      });
+    } else {
+      navigate("/auth");
+    }
+  };
+
+  const handleTrackPartner = async () => {
     if (!partnerCode.trim()) {
       toast({
         title: "Código obrigatório",
@@ -28,40 +80,151 @@ const Index = () => {
       return;
     }
 
-    // Simulando dados do parceiro
-    const mockPartnerData = {
-      name: "João Silva",
-      code: partnerCode,
-      lastSeen: "2 minutos atrás",
-      status: "online",
-      location: {
-        lat: -23.5505,
-        lng: -46.6333,
-        address: "São Paulo, SP - Brasil"
+    try {
+      // Find the partner by tracking code
+      const { data: partnerProfile, error: profileError } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("tracking_code", partnerCode.trim())
+        .single();
+
+      if (profileError || !partnerProfile) {
+        toast({
+          title: "Código não encontrado",
+          description: "Código de rastreamento inválido ou inexistente",
+          variant: "destructive",
+        });
+        return;
       }
-    };
 
-    setPartnerData(mockPartnerData);
-    setIsTracking(true);
-    
-    toast({
-      title: "Rastreamento iniciado!",
-      description: `Agora você está rastreando ${mockPartnerData.name}`,
-    });
+      if (!partnerProfile.is_tracking_active) {
+        toast({
+          title: "Rastreamento inativo",
+          description: "O usuário desativou o rastreamento",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Create tracking relationship
+      const { error: relationshipError } = await supabase
+        .from("tracking_relationships")
+        .insert({
+          tracker_id: user?.id,
+          tracked_id: partnerProfile.id
+        });
+
+      if (relationshipError) {
+        if (relationshipError.code === "23505") { // Unique constraint violation
+          toast({
+            title: "Já rastreando",
+            description: "Você já está rastreando este usuário",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw relationshipError;
+      }
+
+      // Get latest location
+      const { data: location } = await supabase
+        .from("user_locations")
+        .select("*")
+        .eq("user_id", partnerProfile.id)
+        .order("timestamp", { ascending: false })
+        .limit(1)
+        .single();
+
+      const mockPartnerData = {
+        name: partnerProfile.name || "Usuário",
+        code: partnerCode,
+        lastSeen: location ? "Agora" : "Nunca",
+        status: "online",
+        location: location ? {
+          lat: parseFloat(location.latitude),
+          lng: parseFloat(location.longitude),
+          address: location.address || "Localização desconhecida"
+        } : {
+          lat: -23.5505,
+          lng: -46.6333,
+          address: "Localização não disponível"
+        }
+      };
+
+      setPartnerData(mockPartnerData);
+      setIsTracking(true);
+      
+      toast({
+        title: "Rastreamento iniciado!",
+        description: `Agora você está rastreando ${mockPartnerData.name}`,
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível iniciar o rastreamento",
+        variant: "destructive",
+      });
+    }
   };
 
-  const handleStopTracking = () => {
-    setIsTracking(false);
-    setPartnerData(null);
-    setPartnerCode("");
-    
-    toast({
-      title: "Rastreamento parado",
-      description: "Você não está mais rastreando nenhum parceiro",
-    });
+  const handleStopTracking = async () => {
+    if (!partnerData) return;
+
+    try {
+      // Remove tracking relationship
+      const { data: partnerProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("tracking_code", partnerData.code)
+        .single();
+
+      if (partnerProfile) {
+        await supabase
+          .from("tracking_relationships")
+          .delete()
+          .eq("tracker_id", user?.id)
+          .eq("tracked_id", partnerProfile.id);
+      }
+
+      setIsTracking(false);
+      setPartnerData(null);
+      setPartnerCode("");
+      
+      toast({
+        title: "Rastreamento parado",
+        description: "Você não está mais rastreando nenhum parceiro",
+      });
+    } catch (error) {
+      console.error("Error:", error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível parar o rastreamento",
+        variant: "destructive",
+      });
+    }
   };
 
-  // Mostrar tela de código se solicitado
+  // Show loading while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg animate-pulse">
+            <MapPin className="w-10 h-10 text-white" />
+          </div>
+          <p className="text-lg text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth page if not logged in
+  if (!user) {
+    return null;
+  }
+
+  // Show code display if requested
   if (showCodeDisplay) {
     return <CodeDisplay onBack={() => setShowCodeDisplay(false)} />;
   }
@@ -87,6 +250,9 @@ const Index = () => {
                 </Badge>
                 <Button onClick={handleStopTracking} variant="outline">
                   Parar Rastreamento
+                </Button>
+                <Button onClick={handleSignOut} variant="ghost" size="sm">
+                  <LogOut className="w-4 h-4" />
                 </Button>
               </div>
             </div>
@@ -149,6 +315,15 @@ const Index = () => {
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">TrackPartner</h1>
           <p className="text-lg text-gray-600">Rastreie seu parceiro com segurança</p>
+          <div className="mt-4 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Bem-vindo, {userProfile?.name || user?.email}
+            </p>
+            <Button onClick={handleSignOut} variant="ghost" size="sm">
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </Button>
+          </div>
         </div>
 
         <Card className="shadow-xl border-0 bg-white/80 backdrop-blur-sm">
@@ -224,11 +399,13 @@ const Index = () => {
           </Card>
         </div>
 
-        <div className="text-center">
-          <p className="text-sm text-gray-500">
-            Precisa de um código? Entre em contato com seu parceiro
-          </p>
-        </div>
+        {userProfile && (
+          <div className="text-center">
+            <p className="text-sm text-gray-500">
+              Seu código: <span className="font-mono font-bold">{userProfile.tracking_code}</span>
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

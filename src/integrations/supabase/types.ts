@@ -9,7 +9,104 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      profiles: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_tracking_active: boolean | null
+          name: string | null
+          tracking_code: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id: string
+          is_tracking_active?: boolean | null
+          name?: string | null
+          tracking_code?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_tracking_active?: boolean | null
+          name?: string | null
+          tracking_code?: string | null
+        }
+        Relationships: []
+      }
+      tracking_relationships: {
+        Row: {
+          created_at: string | null
+          id: string
+          tracked_id: string
+          tracker_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          tracked_id: string
+          tracker_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          tracked_id?: string
+          tracker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracking_relationships_tracked_id_fkey"
+            columns: ["tracked_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tracking_relationships_tracker_id_fkey"
+            columns: ["tracker_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_locations: {
+        Row: {
+          address: string | null
+          id: string
+          latitude: number
+          longitude: number
+          timestamp: string | null
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          id?: string
+          latitude: number
+          longitude: number
+          timestamp?: string | null
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          id?: string
+          latitude?: number
+          longitude?: number
+          timestamp?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_locations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

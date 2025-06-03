@@ -3,34 +3,83 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, QrCode, Share2, RefreshCw, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Copy, QrCode, Share2, RefreshCw, ArrowLeft, CheckCircle, LogOut } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CodeDisplayProps {
   onBack: () => void;
 }
 
 const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
-  const [userCode, setUserCode] = useState('');
+  const { user, signOut } = useAuth();
+  const [userProfile, setUserProfile] = useState(null);
   const [isActive, setIsActive] = useState(true);
   const [copied, setCopied] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Gerar código único do usuário
-    generateNewCode();
-  }, []);
+    if (user) {
+      fetchUserProfile();
+    }
+  }, [user]);
 
-  const generateNewCode = () => {
+  const fetchUserProfile = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user?.id)
+        .single();
+
+      if (error) {
+        console.error("Error fetching profile:", error);
+        return;
+      }
+
+      setUserProfile(data);
+      setIsActive(data.is_tracking_active);
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const generateNewCode = async () => {
     const prefix = 'PRT';
     const randomNumber = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
     const newCode = `${prefix}-${randomNumber}`;
-    setUserCode(newCode);
+
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ tracking_code: newCode })
+        .eq("id", user?.id);
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível gerar novo código",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      await fetchUserProfile();
+      toast({
+        title: "Novo código gerado!",
+        description: "Um novo código único foi criado para você",
+      });
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
 
   const handleCopyCode = async () => {
+    if (!userProfile?.tracking_code) return;
+    
     try {
-      await navigator.clipboard.writeText(userCode);
+      await navigator.clipboard.writeText(userProfile.tracking_code);
       setCopied(true);
       toast({
         title: "Código copiado!",
@@ -48,11 +97,13 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
   };
 
   const handleShareCode = async () => {
+    if (!userProfile?.tracking_code) return;
+    
     if (navigator.share) {
       try {
         await navigator.share({
           title: 'Meu código TrackPartner',
-          text: `Use este código para me rastrear no TrackPartner: ${userCode}`,
+          text: `Use este código para me rastrear no TrackPartner: ${userProfile.tracking_code}`,
         });
       } catch (error) {
         handleCopyCode();
@@ -62,38 +113,72 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
     }
   };
 
-  const handleToggleStatus = () => {
-    setIsActive(!isActive);
-    toast({
-      title: isActive ? "Rastreamento desativado" : "Rastreamento ativado",
-      description: isActive ? "Seu parceiro não poderá mais te rastrear" : "Seu parceiro já pode te rastrear novamente",
-    });
+  const handleToggleStatus = async () => {
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ is_tracking_active: !isActive })
+        .eq("id", user?.id);
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível alterar o status",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      setIsActive(!isActive);
+      toast({
+        title: isActive ? "Rastreamento desativado" : "Rastreamento ativado",
+        description: isActive ? "Seu parceiro não poderá mais te rastrear" : "Seu parceiro já pode te rastrear novamente",
+      });
+    } catch (error) {
+      console.error("Error:", error);
+    }
   };
 
-  const handleGenerateNewCode = () => {
-    generateNewCode();
-    toast({
-      title: "Novo código gerado!",
-      description: "Um novo código único foi criado para você",
-    });
+  const handleSignOut = async () => {
+    const { error } = await signOut();
+    if (!error) {
+      // Will be redirected by the auth context
+    }
   };
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-lg text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
       <div className="max-w-md mx-auto pt-8">
         <div className="mb-6">
-          <Button 
-            onClick={onBack}
-            variant="outline" 
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Voltar
-          </Button>
+          <div className="flex items-center justify-between mb-4">
+            <Button 
+              onClick={onBack}
+              variant="outline"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Voltar
+            </Button>
+            <Button onClick={handleSignOut} variant="ghost" size="sm">
+              <LogOut className="w-4 h-4" />
+            </Button>
+          </div>
           
           <div className="text-center mb-8">
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Seu Código</h1>
             <p className="text-gray-600">Compartilhe este código com seu parceiro</p>
+            <p className="text-sm text-gray-500 mt-2">
+              Olá, {userProfile.name || user?.email}
+            </p>
           </div>
         </div>
 
@@ -110,7 +195,7 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
             <div className="text-center">
               <div className="bg-gray-50 p-6 rounded-lg border-2 border-dashed border-gray-200 mb-4">
                 <div className="text-3xl font-mono font-bold text-gray-900 tracking-wider">
-                  {userCode}
+                  {userProfile.tracking_code}
                 </div>
               </div>
               
@@ -145,7 +230,7 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
               </Button>
               
               <Button 
-                onClick={handleGenerateNewCode}
+                onClick={generateNewCode}
                 variant="outline"
                 className="w-full flex items-center space-x-2"
               >
