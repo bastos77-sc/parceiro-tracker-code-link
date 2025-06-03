@@ -1,20 +1,21 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MapPin, Clock, Bell, Shield, Users, Search } from "lucide-react";
+import { MapPin, Clock, Bell, Shield, Users, Search, QrCode } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import TrackingMap from "@/components/TrackingMap";
 import LocationHistory from "@/components/LocationHistory";
 import NotificationPanel from "@/components/NotificationPanel";
+import CodeDisplay from "@/components/CodeDisplay";
 
 const Index = () => {
   const [partnerCode, setPartnerCode] = useState("");
   const [isTracking, setIsTracking] = useState(false);
   const [partnerData, setPartnerData] = useState(null);
+  const [showCodeDisplay, setShowCodeDisplay] = useState(false);
   const { toast } = useToast();
 
   const handleTrackPartner = () => {
@@ -59,6 +60,11 @@ const Index = () => {
       description: "Você não está mais rastreando nenhum parceiro",
     });
   };
+
+  // Mostrar tela de código se solicitado
+  if (showCodeDisplay) {
+    return <CodeDisplay onBack={() => setShowCodeDisplay(false)} />;
+  }
 
   if (isTracking && partnerData) {
     return (
@@ -176,6 +182,24 @@ const Index = () => {
             >
               <MapPin className="w-5 h-5 mr-2" />
               Começar Rastreamento
+            </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">ou</span>
+              </div>
+            </div>
+
+            <Button 
+              onClick={() => setShowCodeDisplay(true)}
+              variant="outline"
+              className="w-full h-12 text-lg"
+            >
+              <QrCode className="w-5 h-5 mr-2" />
+              Ver Meu Código
             </Button>
           </CardContent>
         </Card>
