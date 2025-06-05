@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { MapPin, Navigation } from 'lucide-react';
+import GoogleMap from './GoogleMap';
 
 interface TrackingMapProps {
   location: {
@@ -11,6 +12,12 @@ interface TrackingMapProps {
 }
 
 const TrackingMap: React.FC<TrackingMapProps> = ({ location }) => {
+  const [useGoogleMaps, setUseGoogleMaps] = useState(false);
+
+  if (useGoogleMaps) {
+    return <GoogleMap location={location} />;
+  }
+
   return (
     <div className="w-full h-full bg-gradient-to-br from-blue-100 to-indigo-200 rounded-lg relative overflow-hidden">
       {/* Mapa simulado com SVG */}
@@ -60,6 +67,12 @@ const TrackingMap: React.FC<TrackingMapProps> = ({ location }) => {
               </p>
             </div>
           </div>
+          <button
+            onClick={() => setUseGoogleMaps(true)}
+            className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Usar Google Maps
+          </button>
         </div>
       </div>
 
@@ -76,7 +89,7 @@ const TrackingMap: React.FC<TrackingMapProps> = ({ location }) => {
       {/* Indicador de precisão */}
       <div className="absolute top-4 left-4">
         <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-medium">
-          ●  Precisão: Alta
+          ● Precisão: Alta
         </div>
       </div>
     </div>

@@ -8,12 +8,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MapPin, Mail, Lock, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import ForgotPasswordDialog from "@/components/ForgotPasswordDialog";
 
 const Auth = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { signIn, signUp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -146,6 +148,16 @@ const Auth = () => {
                     </div>
                   </div>
 
+                  <div className="text-right">
+                    <button
+                      type="button"
+                      onClick={() => setShowForgotPassword(true)}
+                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
+
                   <Button 
                     type="submit"
                     disabled={loading}
@@ -229,6 +241,11 @@ const Auth = () => {
             </TabsContent>
           </Tabs>
         </Card>
+
+        <ForgotPasswordDialog 
+          isOpen={showForgotPassword}
+          onClose={() => setShowForgotPassword(false)}
+        />
       </div>
     </div>
   );

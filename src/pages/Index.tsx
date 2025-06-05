@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -81,14 +82,28 @@ const Index = () => {
     }
 
     try {
+      console.log('Searching for partner with code:', partnerCode.trim());
+      
       // Find the partner by tracking code
       const { data: partnerProfile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
         .eq("tracking_code", partnerCode.trim())
-        .single();
+        .maybeSingle();
 
-      if (profileError || !partnerProfile) {
+      console.log('Partner search result:', partnerProfile, profileError);
+
+      if (profileError) {
+        console.error('Database error:', profileError);
+        toast({
+          title: "Erro na busca",
+          description: "Erro ao buscar o código no banco de dados",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (!partnerProfile) {
         toast({
           title: "Código não encontrado",
           description: "Código de rastreamento inválido ou inexistente",
@@ -106,6 +121,26 @@ const Index = () => {
         return;
       }
 
+      // Check if already tracking this user
+      const { data: existingRelationship } = await supabase
+        .from("tracking_relationships")
+        .select("id")
+        .eq("tracker_id", user?.id)
+        .eq("tracked_id", partnerProfile.id)
+        .maybeSingle();
+
+      if (existingRelationship) {
+        toast({
+          title: "Já rastreando",
+          description: "Você já está rastreando este usuário",
+          variant: "destructive",
+        });
+        setIsTracking(true);
+        // Get existing partner data
+        await loadPartnerData(partnerProfile);
+        return;
+      }
+
       // Create tracking relationship
       const { error: relationshipError } = await supabase
         .from("tracking_relationships")
@@ -115,48 +150,20 @@ const Index = () => {
         });
 
       if (relationshipError) {
-        if (relationshipError.code === "23505") { // Unique constraint violation
-          toast({
-            title: "Já rastreando",
-            description: "Você já está rastreando este usuário",
-            variant: "destructive",
-          });
-          return;
-        }
-        throw relationshipError;
+        console.error('Error creating relationship:', relationshipError);
+        toast({
+          title: "Erro",
+          description: "Não foi possível criar o relacionamento de rastreamento",
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Get latest location
-      const { data: location } = await supabase
-        .from("user_locations")
-        .select("*")
-        .eq("user_id", partnerProfile.id)
-        .order("timestamp", { ascending: false })
-        .limit(1)
-        .single();
-
-      const mockPartnerData = {
-        name: partnerProfile.name || "Usuário",
-        code: partnerCode,
-        lastSeen: location ? "Agora" : "Nunca",
-        status: "online",
-        location: location ? {
-          lat: parseFloat(location.latitude),
-          lng: parseFloat(location.longitude),
-          address: location.address || "Localização desconhecida"
-        } : {
-          lat: -23.5505,
-          lng: -46.6333,
-          address: "Localização não disponível"
-        }
-      };
-
-      setPartnerData(mockPartnerData);
-      setIsTracking(true);
+      await loadPartnerData(partnerProfile);
       
       toast({
         title: "Rastreamento iniciado!",
-        description: `Agora você está rastreando ${mockPartnerData.name}`,
+        description: `Agora você está rastreando ${partnerProfile.name || 'o usuário'}`,
       });
     } catch (error) {
       console.error("Error:", error);
@@ -166,6 +173,36 @@ const Index = () => {
         variant: "destructive",
       });
     }
+  };
+
+  const loadPartnerData = async (partnerProfile: any) => {
+    // Get latest location
+    const { data: location } = await supabase
+      .from("user_locations")
+      .select("*")
+      .eq("user_id", partnerProfile.id)
+      .order("timestamp", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const mockPartnerData = {
+      name: partnerProfile.name || "Usuário",
+      code: partnerCode,
+      lastSeen: location ? "Agora" : "Nunca",
+      status: "online",
+      location: location ? {
+        lat: parseFloat(location.latitude.toString()),
+        lng: parseFloat(location.longitude.toString()),
+        address: location.address || "Localização desconhecida"
+      } : {
+        lat: -23.5505,
+        lng: -46.6333,
+        address: "Localização não disponível"
+      }
+    };
+
+    setPartnerData(mockPartnerData);
+    setIsTracking(true);
   };
 
   const handleStopTracking = async () => {

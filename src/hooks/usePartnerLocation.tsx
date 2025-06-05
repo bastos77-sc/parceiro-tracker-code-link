@@ -30,6 +30,27 @@ export const usePartnerLocation = () => {
     console.log('Fetching partner location for user:', user.id);
 
     try {
+      // First get the tracking relationships to find tracked users
+      const { data: relationships, error: relationshipError } = await supabase
+        .from('tracking_relationships')
+        .select('tracked_id')
+        .eq('tracker_id', user.id);
+
+      if (relationshipError) {
+        console.error('Error fetching tracking relationships:', relationshipError);
+        setError("Erro ao buscar relacionamentos de rastreamento");
+        return;
+      }
+
+      if (!relationships || relationships.length === 0) {
+        console.log('No tracking relationships found');
+        setPartnerLocation(null);
+        return;
+      }
+
+      // Get the tracked user IDs
+      const trackedUserIds = relationships.map(rel => rel.tracked_id);
+
       // Get the latest location of tracked partners
       const { data, error: fetchError } = await supabase
         .from('user_locations')
@@ -45,13 +66,7 @@ export const usePartnerLocation = () => {
             email
           )
         `)
-        .in(
-          'user_id',
-          supabase
-            .from('tracking_relationships')
-            .select('tracked_id')
-            .eq('tracker_id', user.id)
-        )
+        .in('user_id', trackedUserIds)
         .order('timestamp', { ascending: false })
         .limit(1)
         .maybeSingle();
