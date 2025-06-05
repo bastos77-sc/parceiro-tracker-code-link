@@ -77,17 +77,19 @@ const Index = () => {
     }
 
     try {
-      console.log('=== DEBUGGING TRACKING PROCESS ===');
-      console.log('1. Input partner code:', partnerCode.trim());
-      console.log('2. Current user ID:', user?.id);
+      console.log('=== INICIANDO RASTREAMENTO ===');
+      console.log('Código do parceiro:', partnerCode.trim());
+      console.log('ID do usuário atual:', user?.id);
       
-      // First, let's check if there are any profiles in the database
-      const { data: allProfiles, error: allProfilesError } = await supabase
-        .from("profiles")
-        .select("id, email, name, tracking_code, is_tracking_active");
-      
-      console.log('3. All profiles in database:', allProfiles);
-      console.log('4. All profiles error:', allProfilesError);
+      // Check if user is trying to track themselves
+      if (userProfile?.tracking_code === partnerCode.trim()) {
+        toast({
+          title: "Código inválido",
+          description: "Você não pode rastrear a si mesmo",
+          variant: "destructive",
+        });
+        return;
+      }
       
       // Find the partner by tracking code
       const { data: partnerProfile, error: profileError } = await supabase
@@ -96,36 +98,35 @@ const Index = () => {
         .eq("tracking_code", partnerCode.trim())
         .maybeSingle();
 
-      console.log('5. Partner search result:', partnerProfile);
-      console.log('6. Partner search error:', profileError);
+      console.log('Resultado da busca do parceiro:', partnerProfile);
+      console.log('Erro na busca:', profileError);
 
       if (profileError) {
-        console.error('Database error:', profileError);
+        console.error('Erro no banco de dados:', profileError);
         toast({
           title: "Erro na busca",
-          description: "Erro ao buscar o código no banco de dados: " + profileError.message,
+          description: "Erro ao buscar o código no banco de dados",
           variant: "destructive",
         });
         return;
       }
 
       if (!partnerProfile) {
-        console.log('7. No partner found with code:', partnerCode.trim());
+        // More helpful error message
         toast({
           title: "Código não encontrado",
-          description: `Código de rastreamento "${partnerCode.trim()}" não foi encontrado no sistema`,
+          description: `O código "${partnerCode.trim()}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
           variant: "destructive",
         });
         return;
       }
 
-      console.log('8. Partner found:', partnerProfile);
+      console.log('Parceiro encontrado:', partnerProfile);
 
       if (!partnerProfile.is_tracking_active) {
-        console.log('9. Partner tracking is inactive');
         toast({
           title: "Rastreamento inativo",
-          description: "O usuário desativou o rastreamento",
+          description: "Este usuário desativou o rastreamento",
           variant: "destructive",
         });
         return;
@@ -139,18 +140,15 @@ const Index = () => {
         .eq("tracked_id", partnerProfile.id)
         .maybeSingle();
 
-      console.log('10. Existing relationship check:', existingRelationship);
-      console.log('11. Relationship check error:', relationshipCheckError);
+      console.log('Relacionamento existente:', existingRelationship);
 
       if (existingRelationship) {
-        console.log('12. Already tracking this user');
         toast({
           title: "Já rastreando",
           description: "Você já está rastreando este usuário",
           variant: "destructive",
         });
         setIsTracking(true);
-        // Get existing partner data
         await loadPartnerData(partnerProfile, partnerCode);
         return;
       }
@@ -163,37 +161,35 @@ const Index = () => {
           tracked_id: partnerProfile.id
         });
 
-      console.log('13. Create relationship error:', relationshipError);
-
       if (relationshipError) {
-        console.error('Error creating relationship:', relationshipError);
+        console.error('Erro ao criar relacionamento:', relationshipError);
         toast({
           title: "Erro",
-          description: "Não foi possível criar o relacionamento de rastreamento: " + relationshipError.message,
+          description: "Não foi possível criar o relacionamento de rastreamento",
           variant: "destructive",
         });
         return;
       }
 
-      console.log('14. Relationship created successfully');
+      console.log('Relacionamento criado com sucesso');
       await loadPartnerData(partnerProfile, partnerCode);
       
       toast({
         title: "Rastreamento iniciado!",
-        description: `Agora você está rastreando ${partnerProfile.name || 'o usuário'}`,
+        description: `Agora você está rastreando ${partnerProfile.name || partnerProfile.email}`,
       });
     } catch (error) {
-      console.error("Unexpected error:", error);
+      console.error("Erro inesperado:", error);
       toast({
         title: "Erro",
-        description: "Não foi possível iniciar o rastreamento: " + error.message,
+        description: "Não foi possível iniciar o rastreamento. Tente novamente.",
         variant: "destructive",
       });
     }
   };
 
   const loadPartnerData = async (partnerProfile: any, partnerCode: string) => {
-    console.log('Loading partner data for:', partnerProfile.id);
+    console.log('Carregando dados do parceiro:', partnerProfile.id);
     
     // Get latest location
     const { data: location, error: locationError } = await supabase
@@ -204,11 +200,10 @@ const Index = () => {
       .limit(1)
       .maybeSingle();
 
-    console.log('Partner location:', location);
-    console.log('Location error:', locationError);
+    console.log('Localização do parceiro:', location);
 
     const mockPartnerData = {
-      name: partnerProfile.name || "Usuário",
+      name: partnerProfile.name || partnerProfile.email || "Usuário",
       code: partnerCode,
       lastSeen: location ? "Agora" : "Nunca",
       status: "online",
@@ -223,7 +218,7 @@ const Index = () => {
       }
     };
 
-    console.log('Setting partner data:', mockPartnerData);
+    console.log('Definindo dados do parceiro:', mockPartnerData);
     setPartnerData(mockPartnerData);
     setIsTracking(true);
   };
