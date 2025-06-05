@@ -29,7 +29,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ location }) => {
       }
 
       const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap`;
+      script.src = `https://maps.googleapis.com/maps/api/js?key=AIzaSyAqU2dWwLJqir9wGJr-X1bN7wLYO90qgGo&callback=initMap`;
       script.async = true;
       script.defer = true;
 
@@ -124,7 +124,7 @@ const GoogleMap: React.FC<GoogleMapProps> = ({ location }) => {
       </div>
       
       <div className="absolute bottom-4 left-4 bg-green-100 text-green-800 px-3 py-2 rounded-full text-sm font-medium shadow-lg">
-        ● Mapa do Google
+        ● Google Maps
       </div>
     </div>
   );
