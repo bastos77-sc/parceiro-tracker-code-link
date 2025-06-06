@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, Shield, Clock, Users, LogOut } from "lucide-react";
+import { MapPin, Shield, Clock, Users, LogOut, Search } from "lucide-react";
 import PartnerTrackingForm from "./PartnerTrackingForm";
 
 interface WelcomeScreenProps {
@@ -10,6 +10,7 @@ interface WelcomeScreenProps {
   userEmail: string;
   onTrackPartner: (code: string) => void;
   onShowCode: () => void;
+  onShowValidator: () => void;
   onSignOut: () => void;
 }
 
@@ -18,6 +19,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   userEmail,
   onTrackPartner,
   onShowCode,
+  onShowValidator,
   onSignOut
 }) => {
   return (
@@ -44,6 +46,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           onTrackPartner={onTrackPartner}
           onShowCode={onShowCode}
         />
+
+        <div className="flex justify-center">
+          <Button 
+            onClick={onShowValidator}
+            variant="outline"
+            className="w-full h-12 text-lg border-2 border-blue-200 hover:border-blue-300"
+          >
+            <Search className="w-5 h-5 mr-2" />
+            Validar Código
+          </Button>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
           <Card className="text-center p-4 bg-white/60 backdrop-blur-sm border-0">

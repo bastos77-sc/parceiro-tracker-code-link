@@ -1,10 +1,10 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import CodeDisplay from "@/components/CodeDisplay";
+import CodeValidator from "@/components/CodeValidator";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import TrackingView from "@/components/TrackingView";
 import LoadingScreen from "@/components/LoadingScreen";
@@ -14,6 +14,7 @@ const Index = () => {
   const [isTracking, setIsTracking] = useState(false);
   const [partnerData, setPartnerData] = useState(null);
   const [showCodeDisplay, setShowCodeDisplay] = useState(false);
+  const [showCodeValidator, setShowCodeValidator] = useState(false);
   const [userProfile, setUserProfile] = useState(null);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -112,10 +113,10 @@ const Index = () => {
       }
 
       if (!partnerProfile) {
-        // More helpful error message
+        // Enhanced error message with suggestion to use validator
         toast({
           title: "Código não encontrado",
-          description: `O código "${partnerCode.trim()}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
+          description: `O código "${partnerCode.trim()}" não existe. Use o "Validar Código" para verificar códigos disponíveis.`,
           variant: "destructive",
         });
         return;
@@ -269,6 +270,11 @@ const Index = () => {
     return null;
   }
 
+  // Show code validator if requested
+  if (showCodeValidator) {
+    return <CodeValidator onBack={() => setShowCodeValidator(false)} />;
+  }
+
   // Show code display if requested
   if (showCodeDisplay) {
     return <CodeDisplay onBack={() => setShowCodeDisplay(false)} />;
@@ -290,6 +296,7 @@ const Index = () => {
       userEmail={user.email || ''}
       onTrackPartner={handleTrackPartner}
       onShowCode={() => setShowCodeDisplay(true)}
+      onShowValidator={() => setShowCodeValidator(true)}
       onSignOut={handleSignOut}
     />
   );
