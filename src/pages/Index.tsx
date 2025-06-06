@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfileSetup } from "@/hooks/useProfileSetup";
 import { supabase } from "@/integrations/supabase/client";
 import CodeDisplay from "@/components/CodeDisplay";
 import CodeValidator from "@/components/CodeValidator";
@@ -18,6 +19,9 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // Configurar perfil automaticamente
+  useProfileSetup();
 
   // Redirect to auth if not logged in
   useEffect(() => {

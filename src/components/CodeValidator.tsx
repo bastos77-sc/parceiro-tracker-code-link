@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Search, CheckCircle, XCircle, User, MapPin } from "lucide-react";
+import { Search, CheckCircle, XCircle, User, MapPin, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -16,6 +16,8 @@ const CodeValidator: React.FC<CodeValidatorProps> = ({ onBack }) => {
   const [code, setCode] = useState("");
   const [isChecking, setIsChecking] = useState(false);
   const [validationResult, setValidationResult] = useState<any>(null);
+  const [availableCodes, setAvailableCodes] = useState<any[]>([]);
+  const [loadingCodes, setLoadingCodes] = useState(false);
   const { toast } = useToast();
 
   const validateCode = async () => {
@@ -81,6 +83,34 @@ const CodeValidator: React.FC<CodeValidatorProps> = ({ onBack }) => {
       });
     } finally {
       setIsChecking(false);
+    }
+  };
+
+  const loadAvailableCodes = async () => {
+    setLoadingCodes(true);
+    try {
+      const { data: codes, error } = await supabase
+        .from("profiles")
+        .select("tracking_code, name, email, is_tracking_active")
+        .order("created_at", { ascending: false })
+        .limit(10);
+
+      if (error) {
+        console.error('Erro ao carregar códigos:', error);
+        toast({
+          title: "Erro",
+          description: "Não foi possível carregar os códigos disponíveis",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log('Códigos carregados:', codes);
+      setAvailableCodes(codes || []);
+    } catch (error) {
+      console.error("Erro inesperado:", error);
+    } finally {
+      setLoadingCodes(false);
     }
   };
 
@@ -182,11 +212,35 @@ const CodeValidator: React.FC<CodeValidatorProps> = ({ onBack }) => {
 
         <Card className="bg-blue-50 border-blue-200">
           <CardContent className="p-4">
-            <h3 className="font-semibold text-blue-800 mb-2">Códigos de Teste Disponíveis</h3>
-            <div className="text-sm text-blue-600 space-y-1">
-              <p>• PRT-702243 (usuário ativo)</p>
-              <p>• Para testar com o código PRT-217994, verifique se esse usuário existe</p>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-blue-800">Códigos Disponíveis</h3>
+              <Button 
+                onClick={loadAvailableCodes}
+                disabled={loadingCodes}
+                variant="outline" 
+                size="sm"
+              >
+                <RefreshCw className={`w-4 h-4 mr-2 ${loadingCodes ? 'animate-spin' : ''}`} />
+                Atualizar
+              </Button>
             </div>
+            
+            {availableCodes.length > 0 ? (
+              <div className="space-y-2">
+                {availableCodes.map((profile, index) => (
+                  <div key={index} className="flex items-center justify-between text-sm bg-white p-2 rounded">
+                    <span className="font-mono font-bold text-blue-600">{profile.tracking_code}</span>
+                    <span className="text-gray-600 truncate ml-2">
+                      {profile.name || profile.email}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-sm text-blue-600">
+                <p>Clique em "Atualizar" para ver códigos disponíveis</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
