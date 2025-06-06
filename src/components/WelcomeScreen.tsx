@@ -1,17 +1,15 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, Shield, Clock, Users, LogOut, Search, QrCode } from "lucide-react";
+import { MapPin, Shield, Clock, Users, LogOut } from "lucide-react";
 import PartnerTrackingForm from "./PartnerTrackingForm";
-import QRCodeScanner from "./QRCodeScanner";
 
 interface WelcomeScreenProps {
   userProfile: any;
   userEmail: string;
   onTrackPartner: (code: string) => void;
   onShowCode: () => void;
-  onShowValidator: () => void;
   onSignOut: () => void;
 }
 
@@ -20,20 +18,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   userEmail,
   onTrackPartner,
   onShowCode,
-  onShowValidator,
   onSignOut
 }) => {
-  const [showQRScanner, setShowQRScanner] = useState(false);
-
-  if (showQRScanner) {
-    return (
-      <QRCodeScanner
-        onCodeScanned={onTrackPartner}
-        onBack={() => setShowQRScanner(false)}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
@@ -58,26 +44,6 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           onTrackPartner={onTrackPartner}
           onShowCode={onShowCode}
         />
-
-        <div className="grid grid-cols-2 gap-3">
-          <Button 
-            onClick={() => setShowQRScanner(true)}
-            variant="outline"
-            className="h-12 text-sm border-2 border-green-200 hover:border-green-300"
-          >
-            <QrCode className="w-4 h-4 mr-2" />
-            Escanear QR
-          </Button>
-          
-          <Button 
-            onClick={onShowValidator}
-            variant="outline"
-            className="h-12 text-sm border-2 border-blue-200 hover:border-blue-300"
-          >
-            <Search className="w-4 h-4 mr-2" />
-            Validar Código
-          </Button>
-        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8">
           <Card className="text-center p-4 bg-white/60 backdrop-blur-sm border-0">

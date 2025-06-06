@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -6,7 +7,6 @@ import { Copy, QrCode, Share2, RefreshCw, ArrowLeft, CheckCircle, LogOut } from 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import QRCodeGenerator from './QRCodeGenerator';
 
 interface CodeDisplayProps {
   onBack: () => void;
@@ -17,7 +17,6 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
   const [userProfile, setUserProfile] = useState(null);
   const [isActive, setIsActive] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [showQRCode, setShowQRCode] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -157,17 +156,6 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
     );
   }
 
-  // Show QR code generator if requested
-  if (showQRCode) {
-    return (
-      <QRCodeGenerator
-        trackingCode={userProfile.tracking_code}
-        userName={userProfile.name || user?.email || 'Usuário'}
-        onBack={() => setShowQRCode(false)}
-      />
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 p-4">
       <div className="max-w-md mx-auto pt-8">
@@ -211,35 +199,23 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-2 gap-3">
                 <Button 
                   onClick={handleCopyCode}
                   variant="outline"
-                  size="sm"
-                  className="flex items-center space-x-1"
+                  className="flex items-center space-x-2"
                 >
-                  {copied ? <CheckCircle className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  <span className="text-xs">{copied ? 'Copiado!' : 'Copiar'}</span>
-                </Button>
-                
-                <Button 
-                  onClick={() => setShowQRCode(true)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center space-x-1"
-                >
-                  <QrCode className="w-3 h-3" />
-                  <span className="text-xs">QR Code</span>
+                  {copied ? <CheckCircle className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  <span>{copied ? 'Copiado!' : 'Copiar'}</span>
                 </Button>
                 
                 <Button 
                   onClick={handleShareCode}
                   variant="outline"
-                  size="sm"
-                  className="flex items-center space-x-1"
+                  className="flex items-center space-x-2"
                 >
-                  <Share2 className="w-3 h-3" />
-                  <span className="text-xs">Compartilhar</span>
+                  <Share2 className="w-4 h-4" />
+                  <span>Compartilhar</span>
                 </Button>
               </div>
             </div>
@@ -272,8 +248,7 @@ const CodeDisplay: React.FC<CodeDisplayProps> = ({ onBack }) => {
               <div>
                 <h3 className="font-medium text-blue-900 mb-1">Como usar</h3>
                 <p className="text-sm text-blue-700">
-                  Envie este código para seu parceiro ou gere um QR code para facilitar o compartilhamento. 
-                  Ele poderá inserir o código no app para começar a te rastrear.
+                  Envie este código para seu parceiro. Ele poderá inserir o código no app para começar a te rastrear.
                 </p>
               </div>
             </div>
