@@ -1,9 +1,10 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { MapPin, Shield, Clock, Users, LogOut, Search } from "lucide-react";
+import { MapPin, Shield, Clock, Users, LogOut, Search, QrCode } from "lucide-react";
 import PartnerTrackingForm from "./PartnerTrackingForm";
+import QRCodeScanner from "./QRCodeScanner";
 
 interface WelcomeScreenProps {
   userProfile: any;
@@ -22,6 +23,17 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
   onShowValidator,
   onSignOut
 }) => {
+  const [showQRScanner, setShowQRScanner] = useState(false);
+
+  if (showQRScanner) {
+    return (
+      <QRCodeScanner
+        onCodeScanned={onTrackPartner}
+        onBack={() => setShowQRScanner(false)}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full space-y-8">
@@ -47,13 +59,22 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
           onShowCode={onShowCode}
         />
 
-        <div className="flex justify-center">
+        <div className="grid grid-cols-2 gap-3">
+          <Button 
+            onClick={() => setShowQRScanner(true)}
+            variant="outline"
+            className="h-12 text-sm border-2 border-green-200 hover:border-green-300"
+          >
+            <QrCode className="w-4 h-4 mr-2" />
+            Escanear QR
+          </Button>
+          
           <Button 
             onClick={onShowValidator}
             variant="outline"
-            className="w-full h-12 text-lg border-2 border-blue-200 hover:border-blue-300"
+            className="h-12 text-sm border-2 border-blue-200 hover:border-blue-300"
           >
-            <Search className="w-5 h-5 mr-2" />
+            <Search className="w-4 h-4 mr-2" />
             Validar Código
           </Button>
         </div>
