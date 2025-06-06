@@ -110,6 +110,46 @@ export const usePartnerLocation = () => {
     }
   }, [user]);
 
+  // Set up real-time subscription for location updates
+  useEffect(() => {
+    if (!user) return;
+
+    console.log('Setting up real-time subscription for location updates');
+    
+    const channel = supabase
+      .channel('location-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'user_locations'
+        },
+        (payload) => {
+          console.log('New location update received:', payload);
+          fetchPartnerLocation(); // Refetch when new location is added
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_locations'
+        },
+        (payload) => {
+          console.log('Location update received:', payload);
+          fetchPartnerLocation(); // Refetch when location is updated
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up real-time subscription');
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
   return {
     partnerLocation,
     loading,
