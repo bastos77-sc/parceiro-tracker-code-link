@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,24 +36,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Create profile when user signs up - Fixed comparison
-        if (event === 'SIGNED_UP' && session?.user) {
-          console.log('Creating profile for new user:', session.user.id);
-          setTimeout(async () => {
-            const { error } = await supabase
-              .from('profiles')
-              .insert({
-                id: session.user.id,
-                email: session.user.email || '',
-                name: session.user.user_metadata?.name || ''
-              });
-            
-            if (error) {
-              console.error('Error creating profile:', error);
-            } else {
-              console.log('Profile created successfully');
-            }
-          }, 0);
+        // Create profile when user signs up - Fixed comparison to use correct event type
+        if (event === 'SIGNED_IN' && session?.user) {
+          console.log('User signed in, checking if profile exists:', session.user.id);
+          
+          // Check if this is a new user by looking for existing profile
+          const { data: existingProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('id', session.user.id)
+            .maybeSingle();
+          
+          // If no profile exists, create one (this means it's a new signup)
+          if (!existingProfile) {
+            console.log('Creating profile for new user:', session.user.id);
+            setTimeout(async () => {
+              const { error } = await supabase
+                .from('profiles')
+                .insert({
+                  id: session.user.id,
+                  email: session.user.email || '',
+                  name: session.user.user_metadata?.name || ''
+                });
+              
+              if (error) {
+                console.error('Error creating profile:', error);
+              } else {
+                console.log('Profile created successfully');
+              }
+            }, 0);
+          }
         }
       }
     );
