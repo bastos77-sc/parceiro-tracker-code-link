@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session, AuthChangeEvent } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +32,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: AuthChangeEvent, session) => {
+        console.log('=== AUTH STATE CHANGE ===');
         console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
@@ -38,33 +40,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Create profile when user signs up - Fixed comparison to use correct event type
         if (event === 'SIGNED_IN' && session?.user) {
+          console.log('=== VERIFICANDO/CRIANDO PERFIL ===');
           console.log('User signed in, checking if profile exists:', session.user.id);
           
           // Check if this is a new user by looking for existing profile
-          const { data: existingProfile } = await supabase
+          const { data: existingProfile, error: profileCheckError } = await supabase
             .from('profiles')
-            .select('id')
+            .select('id, tracking_code')
             .eq('id', session.user.id)
             .maybeSingle();
           
+          console.log('Perfil existente encontrado:', existingProfile);
+          console.log('Erro ao verificar perfil:', profileCheckError);
+          
           // If no profile exists, create one (this means it's a new signup)
           if (!existingProfile) {
+            console.log('=== CRIANDO PERFIL PARA NOVO USUÁRIO ===');
             console.log('Creating profile for new user:', session.user.id);
+            
+            // Generate unique tracking code
+            const prefix = 'PRT';
+            const randomNumber = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+            const newTrackingCode = `${prefix}-${randomNumber}`;
+            
+            console.log('Código de rastreamento gerado:', newTrackingCode);
+            
             setTimeout(async () => {
-              const { error } = await supabase
+              const { data: insertedProfile, error } = await supabase
                 .from('profiles')
                 .insert({
                   id: session.user.id,
                   email: session.user.email || '',
-                  name: session.user.user_metadata?.name || ''
-                });
+                  name: session.user.user_metadata?.name || '',
+                  tracking_code: newTrackingCode,
+                  is_tracking_active: true
+                })
+                .select()
+                .single();
+              
+              console.log('Perfil inserido:', insertedProfile);
+              console.log('Erro ao inserir perfil:', error);
               
               if (error) {
                 console.error('Error creating profile:', error);
               } else {
-                console.log('Profile created successfully');
+                console.log('Profile created successfully with tracking code:', newTrackingCode);
               }
             }, 0);
+          } else {
+            console.log('Perfil já existe para o usuário:', session.user.id);
+            console.log('Código de rastreamento existente:', existingProfile.tracking_code);
           }
         }
       }
@@ -72,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('=== VERIFICAÇÃO DE SESSÃO INICIAL ===');
       console.log('Initial session check:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
@@ -82,6 +108,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = async (email: string, password: string, name?: string) => {
+    console.log('=== INICIANDO CADASTRO ===');
+    console.log('Email:', email);
+    console.log('Nome:', name);
+    
     const redirectUrl = `${window.location.origin}/`;
     
     const { error } = await supabase.auth.signUp({
@@ -95,20 +125,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
     
+    console.log('Resultado do cadastro - erro:', error);
     return { error };
   };
 
   const signIn = async (email: string, password: string) => {
+    console.log('=== INICIANDO LOGIN ===');
+    console.log('Email:', email);
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password
     });
     
+    console.log('Resultado do login - erro:', error);
     return { error };
   };
 
   const signOut = async () => {
+    console.log('=== FAZENDO LOGOUT ===');
     const { error } = await supabase.auth.signOut();
+    console.log('Resultado do logout - erro:', error);
     return { error };
   };
 

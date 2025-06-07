@@ -41,22 +41,27 @@ const Index = () => {
 
   const fetchUserProfile = async () => {
     try {
+      console.log('=== BUSCANDO PERFIL DO USUÁRIO ===');
       console.log('Fetching user profile for:', user?.id);
+      
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", user?.id)
         .single();
 
+      console.log('Query result - data:', data);
+      console.log('Query result - error:', error);
+
       if (error) {
         console.error("Error fetching profile:", error);
         return;
       }
 
-      console.log('User profile fetched:', data);
+      console.log('User profile fetched successfully:', data);
       setUserProfile(data);
     } catch (error) {
-      console.error("Error:", error);
+      console.error("Unexpected error fetching profile:", error);
     }
   };
 
@@ -77,7 +82,9 @@ const Index = () => {
   };
 
   const handleTrackPartner = async (partnerCode: string) => {
-    if (!partnerCode.trim()) {
+    const trimmedCode = partnerCode.trim();
+    
+    if (!trimmedCode) {
       toast({
         title: "Código obrigatório",
         description: "Por favor, insira o código único do seu parceiro",
@@ -88,11 +95,14 @@ const Index = () => {
 
     try {
       console.log('=== INICIANDO RASTREAMENTO DO PARCEIRO ===');
-      console.log('Código do parceiro:', partnerCode.trim());
+      console.log('Código original digitado:', `"${partnerCode}"`);
+      console.log('Código após trim:', `"${trimmedCode}"`);
+      console.log('Tamanho do código:', trimmedCode.length);
       console.log('ID do usuário atual:', user?.id);
+      console.log('Código do usuário atual:', userProfile?.tracking_code);
       
       // Check if user is trying to track themselves
-      if (userProfile?.tracking_code === partnerCode.trim()) {
+      if (userProfile?.tracking_code === trimmedCode) {
         toast({
           title: "Código inválido",
           description: "Você não pode rastrear a si mesmo",
@@ -101,37 +111,55 @@ const Index = () => {
         return;
       }
       
+      // Debug: Verificar todos os códigos existentes na base
+      console.log('=== VERIFICANDO TODOS OS CÓDIGOS EXISTENTES ===');
+      const { data: allProfiles, error: allProfilesError } = await supabase
+        .from("profiles")
+        .select("id, email, name, tracking_code, is_tracking_active");
+      
+      console.log('Todos os perfis na base:', allProfiles);
+      console.log('Erro ao buscar todos os perfis:', allProfilesError);
+      
       // Find the partner by tracking code
+      console.log('=== BUSCANDO PARCEIRO PELO CÓDIGO ===');
       const { data: partnerProfile, error: profileError } = await supabase
         .from("profiles")
         .select("*")
-        .eq("tracking_code", partnerCode.trim())
+        .eq("tracking_code", trimmedCode)
         .maybeSingle();
 
+      console.log('Query executada para código:', trimmedCode);
       console.log('Resultado da busca do parceiro:', partnerProfile);
+      console.log('Erro na busca:', profileError);
 
       if (profileError) {
         console.error('Erro no banco de dados:', profileError);
         toast({
           title: "Erro na busca",
-          description: "Erro ao buscar o código no banco de dados",
+          description: "Erro ao buscar o código no banco de dados: " + profileError.message,
           variant: "destructive",
         });
         return;
       }
 
       if (!partnerProfile) {
+        console.log('=== CÓDIGO NÃO ENCONTRADO ===');
+        console.log('Código buscado:', trimmedCode);
+        console.log('Códigos existentes na base:', allProfiles?.map(p => p.tracking_code) || []);
+        
         toast({
           title: "Código não encontrado",
-          description: `O código "${partnerCode.trim()}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
+          description: `O código "${trimmedCode}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
           variant: "destructive",
         });
         return;
       }
 
-      console.log('Parceiro encontrado:', partnerProfile);
+      console.log('=== PARCEIRO ENCONTRADO ===');
+      console.log('Dados do parceiro:', partnerProfile);
 
       if (!partnerProfile.is_tracking_active) {
+        console.log('Rastreamento do parceiro está inativo');
         toast({
           title: "Rastreamento inativo",
           description: "Este usuário desativou o rastreamento",
@@ -141,6 +169,7 @@ const Index = () => {
       }
 
       // Check if already tracking this user
+      console.log('=== VERIFICANDO RELACIONAMENTO EXISTENTE ===');
       const { data: existingRelationship, error: relationshipCheckError } = await supabase
         .from("tracking_relationships")
         .select("id")
@@ -148,18 +177,23 @@ const Index = () => {
         .eq("tracked_id", partnerProfile.id)
         .maybeSingle();
 
+      console.log('Relacionamento existente:', existingRelationship);
+      console.log('Erro ao verificar relacionamento:', relationshipCheckError);
+
       if (existingRelationship) {
+        console.log('Já está rastreando este usuário');
         toast({
           title: "Já rastreando",
           description: "Você já está rastreando este usuário",
           variant: "default",
         });
         setIsTracking(true);
-        await loadPartnerData(partnerProfile, partnerCode);
+        await loadPartnerData(partnerProfile, trimmedCode);
         return;
       }
 
       // Create tracking relationship
+      console.log('=== CRIANDO RELACIONAMENTO DE RASTREAMENTO ===');
       const { error: relationshipError } = await supabase
         .from("tracking_relationships")
         .insert({
@@ -167,18 +201,20 @@ const Index = () => {
           tracked_id: partnerProfile.id
         });
 
+      console.log('Erro ao criar relacionamento:', relationshipError);
+
       if (relationshipError) {
         console.error('Erro ao criar relacionamento:', relationshipError);
         toast({
           title: "Erro",
-          description: "Não foi possível criar o relacionamento de rastreamento",
+          description: "Não foi possível criar o relacionamento de rastreamento: " + relationshipError.message,
           variant: "destructive",
         });
         return;
       }
 
       console.log('Relacionamento criado com sucesso');
-      await loadPartnerData(partnerProfile, partnerCode);
+      await loadPartnerData(partnerProfile, trimmedCode);
       
       toast({
         title: "Rastreamento iniciado!",
@@ -195,6 +231,7 @@ const Index = () => {
   };
 
   const loadPartnerData = async (partnerProfile: any, partnerCode: string) => {
+    console.log('=== CARREGANDO DADOS DO PARCEIRO ===');
     console.log('Carregando dados do parceiro:', partnerProfile.id);
     
     // Get latest location
@@ -207,6 +244,7 @@ const Index = () => {
       .maybeSingle();
 
     console.log('Localização do parceiro:', location);
+    console.log('Erro ao buscar localização:', locationError);
 
     const partnerData = {
       name: partnerProfile.name || partnerProfile.email || "Usuário",
@@ -233,6 +271,7 @@ const Index = () => {
     if (!partnerData) return;
 
     try {
+      console.log('=== PARANDO RASTREAMENTO ===');
       // Remove tracking relationship
       const { data: partnerProfile } = await supabase
         .from("profiles")
