@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { useGeolocation } from "@/hooks/useGeolocation";
 import CodeDisplay from "@/components/CodeDisplay";
 import WelcomeScreen from "@/components/WelcomeScreen";
 import TrackingView from "@/components/TrackingView";
@@ -17,6 +18,9 @@ const Index = () => {
   const [userProfile, setUserProfile] = useState(null);
   const { toast } = useToast();
   const navigate = useNavigate();
+  
+  // Hook de geolocalização para o usuário atual
+  const { startTracking: startOwnTracking, stopTracking: stopOwnTracking, isTracking: isOwnTracking } = useGeolocation();
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -29,6 +33,9 @@ const Index = () => {
   useEffect(() => {
     if (user) {
       fetchUserProfile();
+      // Iniciar rastreamento próprio automaticamente quando logado
+      console.log('Usuário logado, iniciando rastreamento próprio...');
+      startOwnTracking();
     }
   }, [user]);
 
@@ -54,6 +61,9 @@ const Index = () => {
   };
 
   const handleSignOut = async () => {
+    // Parar rastreamento próprio ao sair
+    stopOwnTracking();
+    
     const { error } = await signOut();
     if (error) {
       toast({
@@ -77,7 +87,7 @@ const Index = () => {
     }
 
     try {
-      console.log('=== INICIANDO RASTREAMENTO ===');
+      console.log('=== INICIANDO RASTREAMENTO DO PARCEIRO ===');
       console.log('Código do parceiro:', partnerCode.trim());
       console.log('ID do usuário atual:', user?.id);
       
@@ -99,7 +109,6 @@ const Index = () => {
         .maybeSingle();
 
       console.log('Resultado da busca do parceiro:', partnerProfile);
-      console.log('Erro na busca:', profileError);
 
       if (profileError) {
         console.error('Erro no banco de dados:', profileError);
@@ -112,7 +121,6 @@ const Index = () => {
       }
 
       if (!partnerProfile) {
-        // More helpful error message
         toast({
           title: "Código não encontrado",
           description: `O código "${partnerCode.trim()}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
@@ -140,13 +148,11 @@ const Index = () => {
         .eq("tracked_id", partnerProfile.id)
         .maybeSingle();
 
-      console.log('Relacionamento existente:', existingRelationship);
-
       if (existingRelationship) {
         toast({
           title: "Já rastreando",
           description: "Você já está rastreando este usuário",
-          variant: "destructive",
+          variant: "default",
         });
         setIsTracking(true);
         await loadPartnerData(partnerProfile, partnerCode);
@@ -202,11 +208,11 @@ const Index = () => {
 
     console.log('Localização do parceiro:', location);
 
-    const mockPartnerData = {
+    const partnerData = {
       name: partnerProfile.name || partnerProfile.email || "Usuário",
       code: partnerCode,
       lastSeen: location ? "Agora" : "Nunca",
-      status: "online",
+      status: location ? "online" : "offline",
       location: location ? {
         lat: parseFloat(location.latitude.toString()),
         lng: parseFloat(location.longitude.toString()),
@@ -218,8 +224,8 @@ const Index = () => {
       }
     };
 
-    console.log('Definindo dados do parceiro:', mockPartnerData);
-    setPartnerData(mockPartnerData);
+    console.log('Definindo dados do parceiro:', partnerData);
+    setPartnerData(partnerData);
     setIsTracking(true);
   };
 
