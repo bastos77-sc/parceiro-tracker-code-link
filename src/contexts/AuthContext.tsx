@@ -23,6 +23,31 @@ export const useAuth = () => {
   return context;
 };
 
+// Função para gerar código único de rastreamento
+const generateUniqueTrackingCode = async (): Promise<string> => {
+  let isUnique = false;
+  let trackingCode = '';
+  
+  while (!isUnique) {
+    const prefix = 'PRT';
+    const randomNumber = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
+    trackingCode = `${prefix}-${randomNumber}`;
+    
+    // Verificar se o código já existe
+    const { data: existingCode } = await supabase
+      .from('profiles')
+      .select('tracking_code')
+      .eq('tracking_code', trackingCode)
+      .maybeSingle();
+    
+    if (!existingCode) {
+      isUnique = true;
+    }
+  }
+  
+  return trackingCode;
+};
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -38,59 +63,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(session?.user ?? null);
         setLoading(false);
 
-        // Create profile when user signs up - Fixed comparison to use correct event type
+        // Create or verify profile when user signs in
         if (event === 'SIGNED_IN' && session?.user) {
           console.log('=== VERIFICANDO/CRIANDO PERFIL ===');
-          console.log('User signed in, checking if profile exists:', session.user.id);
+          console.log('User signed in, checking profile for:', session.user.id);
           
-          // Check if this is a new user by looking for existing profile
-          const { data: existingProfile, error: profileCheckError } = await supabase
-            .from('profiles')
-            .select('id, tracking_code')
-            .eq('id', session.user.id)
-            .maybeSingle();
-          
-          console.log('Perfil existente encontrado:', existingProfile);
-          console.log('Erro ao verificar perfil:', profileCheckError);
-          
-          // If no profile exists, create one (this means it's a new signup)
-          if (!existingProfile) {
-            console.log('=== CRIANDO PERFIL PARA NOVO USUÁRIO ===');
-            console.log('Creating profile for new user:', session.user.id);
-            
-            // Generate unique tracking code
-            const prefix = 'PRT';
-            const randomNumber = Math.floor(Math.random() * 1000000).toString().padStart(6, '0');
-            const newTrackingCode = `${prefix}-${randomNumber}`;
-            
-            console.log('Código de rastreamento gerado:', newTrackingCode);
-            
-            setTimeout(async () => {
-              const { data: insertedProfile, error } = await supabase
+          setTimeout(async () => {
+            try {
+              // Verificar se o perfil já existe
+              const { data: existingProfile, error: profileCheckError } = await supabase
                 .from('profiles')
-                .insert({
-                  id: session.user.id,
-                  email: session.user.email || '',
-                  name: session.user.user_metadata?.name || '',
-                  tracking_code: newTrackingCode,
-                  is_tracking_active: true
-                })
-                .select()
-                .single();
+                .select('id, tracking_code, email, name')
+                .eq('id', session.user.id)
+                .maybeSingle();
               
-              console.log('Perfil inserido:', insertedProfile);
-              console.log('Erro ao inserir perfil:', error);
+              console.log('Perfil existente encontrado:', existingProfile);
+              console.log('Erro ao verificar perfil:', profileCheckError);
               
-              if (error) {
-                console.error('Error creating profile:', error);
-              } else {
-                console.log('Profile created successfully with tracking code:', newTrackingCode);
+              if (profileCheckError && profileCheckError.code !== 'PGRST116') {
+                console.error('Erro ao buscar perfil:', profileCheckError);
+                return;
               }
-            }, 0);
-          } else {
-            console.log('Perfil já existe para o usuário:', session.user.id);
-            console.log('Código de rastreamento existente:', existingProfile.tracking_code);
-          }
+              
+              if (!existingProfile) {
+                // Criar novo perfil com código único
+                console.log('=== CRIANDO PERFIL PARA NOVO USUÁRIO ===');
+                
+                const newTrackingCode = await generateUniqueTrackingCode();
+                console.log('Código de rastreamento gerado:', newTrackingCode);
+                
+                const { data: insertedProfile, error: insertError } = await supabase
+                  .from('profiles')
+                  .insert({
+                    id: session.user.id,
+                    email: session.user.email || '',
+                    name: session.user.user_metadata?.name || '',
+                    tracking_code: newTrackingCode,
+                    is_tracking_active: true
+                  })
+                  .select()
+                  .single();
+                
+                console.log('Perfil inserido:', insertedProfile);
+                console.log('Erro ao inserir perfil:', insertError);
+                
+                if (insertError) {
+                  console.error('Error creating profile:', insertError);
+                } else {
+                  console.log('Profile created successfully with tracking code:', newTrackingCode);
+                }
+              } else if (!existingProfile.tracking_code) {
+                // Atualizar perfil existente que não tem tracking_code
+                console.log('=== ATUALIZANDO PERFIL SEM TRACKING CODE ===');
+                
+                const newTrackingCode = await generateUniqueTrackingCode();
+                console.log('Gerando código para perfil existente:', newTrackingCode);
+                
+                const { error: updateError } = await supabase
+                  .from('profiles')
+                  .update({ tracking_code: newTrackingCode })
+                  .eq('id', session.user.id);
+                
+                if (updateError) {
+                  console.error('Erro ao atualizar tracking code:', updateError);
+                } else {
+                  console.log('Tracking code atualizado com sucesso:', newTrackingCode);
+                }
+              } else {
+                console.log('Perfil já existe com tracking code:', existingProfile.tracking_code);
+              }
+            } catch (error) {
+              console.error('Erro inesperado ao gerenciar perfil:', error);
+            }
+          }, 0);
         }
       }
     );

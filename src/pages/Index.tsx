@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
@@ -120,11 +119,11 @@ const Index = () => {
       console.log('Todos os perfis na base:', allProfiles);
       console.log('Erro ao buscar todos os perfis:', allProfilesError);
       
-      // Find the partner by tracking code
+      // Find the partner by tracking code with better error handling
       console.log('=== BUSCANDO PARCEIRO PELO CÓDIGO ===');
       const { data: partnerProfile, error: profileError } = await supabase
         .from("profiles")
-        .select("*")
+        .select("id, email, name, tracking_code, is_tracking_active")
         .eq("tracking_code", trimmedCode)
         .maybeSingle();
 
@@ -132,6 +131,7 @@ const Index = () => {
       console.log('Resultado da busca do parceiro:', partnerProfile);
       console.log('Erro na busca:', profileError);
 
+      // Handle different types of errors
       if (profileError) {
         console.error('Erro no banco de dados:', profileError);
         toast({
@@ -145,11 +145,18 @@ const Index = () => {
       if (!partnerProfile) {
         console.log('=== CÓDIGO NÃO ENCONTRADO ===');
         console.log('Código buscado:', trimmedCode);
-        console.log('Códigos existentes na base:', allProfiles?.map(p => p.tracking_code) || []);
+        
+        // Mostrar códigos existentes para debug
+        const existingCodes = allProfiles?.map(p => p.tracking_code).filter(Boolean) || [];
+        console.log('Códigos existentes na base:', existingCodes);
+        
+        // Verificar se o formato está correto
+        const isValidFormat = /^PRT-\d{6}$/.test(trimmedCode);
+        console.log('Formato do código é válido (PRT-XXXXXX):', isValidFormat);
         
         toast({
           title: "Código não encontrado",
-          description: `O código "${trimmedCode}" não existe. Verifique se está correto ou peça ao seu parceiro para confirmar o código dele.`,
+          description: `O código "${trimmedCode}" não foi encontrado. Verifique se está digitado corretamente (formato: PRT-123456).`,
           variant: "destructive",
         });
         return;
